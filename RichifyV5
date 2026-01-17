@@ -1,18 +1,35 @@
---// WHITELIST (runs first)
+--// ===== WHITELIST (MINIMAL + SAFE) =====
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 
-local WHITELIST = {
-    [10140512827] = true,
-    [2018094786] = true
-}
+local WHITELIST_URL = "https://raw.githubusercontent.com/Wyroke/Whitelist/refs/heads/main/SpecWL"
 
-if not WHITELIST[LocalPlayer.UserId] then
-    LocalPlayer:Kick("You are not whitelisted.")
-    return
+local function checkWhitelist()
+    local player = Players.LocalPlayer
+    if not player then
+        repeat task.wait() until Players.LocalPlayer
+        player = Players.LocalPlayer
+    end
+
+    local ok, data = pcall(function()
+        return game:HttpGet(WHITELIST_URL, true)
+    end)
+
+    if not ok or type(data) ~= "string" then
+        return false, player
+    end
+
+    for id in data:gmatch("%d+") do
+        if tonumber(id) == player.UserId then
+            return true, player
+        end
+    end
+
+    return false, player
 end
+--// =====================================
 
---// ORIGINAL LOADER
+
+--// ORIGINAL WORKING LOADER (UNCHANGED)
 local isfile = isfile or function(file)
 	local suc, res = pcall(function()
 		return readfile(file)
@@ -28,24 +45,21 @@ local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
 			return game:HttpGet(
-				'https://raw.githubusercontent.com/Wyroke/SHIZNISJOSJOSJO/' ..
-				readfile('ReVape/profiles/commit.txt') .. '/' ..
-				select(1, path:gsub('ReVape/', '')),
-				true
-			)
+                'https://raw.githubusercontent.com/Wyroke/SHIZNISJOSJOSJO/' ..
+                readfile('ReVape/profiles/commit.txt') ..
+                '/' ..
+                select(1, path:gsub('ReVape/', '')),
+                true
+            )
 		end)
-
 		if not suc or res == '404: Not Found' then
 			error(res)
 		end
-
 		if path:find('.lua') then
-			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n' .. res
+			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
 		end
-
 		writefile(path, res)
 	end
-
 	return (func or readfile)(path)
 end
 
@@ -95,6 +109,17 @@ if not shared.VapeDeveloper then
 	end
 
 	writefile('ReVape/profiles/commit.txt', commit)
+end
+
+
+--// RUN WHITELIST CHECK LAST (SAFE)
+local allowed, player = checkWhitelist()
+if not allowed then
+	task.spawn(function()
+		task.wait(1)
+		player:Kick("You are not whitelisted.")
+	end)
+	return
 end
 
 return loadstring(downloadFile('ReVape/main.lua'), 'main')()
